@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý chi tiêu",
+  "description": "Ứng dụng quản lý chi tiêu cá nhân thông minh dành cho sinh viên Đại học, giúp chi tiêu hợp lý với giao diện màu nhạt dễ chịu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
