@@ -104,7 +104,6 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  phone?: string; // Số điện thoại đăng nhập
   password?: string; // Mật khẩu tài khoản
   emailVerified?: boolean;
   gender?: GenderType; // Giới tính

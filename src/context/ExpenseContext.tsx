@@ -50,12 +50,9 @@ interface ExpenseContextType {
   authModalMode: 'login' | 'register' | 'profile' | 'forgot_password' | 'change_password';
   setAuthModalMode: (mode: 'login' | 'register' | 'profile' | 'forgot_password' | 'change_password') => void;
   login: (
-    emailOrId: string,
-    password?: string,
-    autoCreate?: boolean,
-    bypassPassword?: boolean
+    email: string,
+    password?: string
   ) => LoginResult;
-  loginAsDemoUser: (user: UserProfile) => void;
   register: (data: Omit<UserProfile, 'id' | 'joinedDate'>, password?: string) => boolean;
   logout: () => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
@@ -153,20 +150,28 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   >('login');
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
-  // Authentication State (Defaults to null so user is in Guest/Basic mode until login)
+  // Authentication State (Defaults to null so user must register or login)
   const [savedUsers, setSavedUsers] = useState<UserProfile[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ALL_USERS);
       if (saved) {
         const parsed: UserProfile[] = JSON.parse(saved);
-        return parsed.map((u) => ({
-          ...u,
-          password: u.password || '123456',
-        }));
+        // Filter out any previous mock accounts
+        return parsed
+          .filter(
+            (u) =>
+              u.id !== 'user-minhanh' &&
+              u.id !== 'user-quanghuy' &&
+              u.id !== 'user-maiphuong'
+          )
+          .map((u) => ({
+            ...u,
+            password: u.password || '123456',
+          }));
       }
-      return DEFAULT_USERS;
+      return [];
     } catch {
-      return DEFAULT_USERS;
+      return [];
     }
   });
 
@@ -174,7 +179,17 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
       if (!saved || saved === 'null') return null;
-      return JSON.parse(saved);
+      const parsed: UserProfile = JSON.parse(saved);
+      // If current user is one of the old mock users, log them out
+      if (
+        parsed.id === 'user-minhanh' ||
+        parsed.id === 'user-quanghuy' ||
+        parsed.id === 'user-maiphuong'
+      ) {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -196,9 +211,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Helper to get per-user storage key
   const getUserKey = (baseKey: string, userId?: string | null) =>
     userId ? `${baseKey}_${userId}` : baseKey;
-
-  const isDemoUser = (userId?: string | null) =>
-    !!userId && DEFAULT_USERS.some((u) => u.id === userId);
 
   const initializeFreshUserData = (userId: string, userName: string) => {
     const freshAccounts = EMPTY_ACCOUNTS.map((acc) => ({ ...acc, balance: 0 }));
@@ -245,7 +257,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const uid = user.id;
-    const demo = isDemoUser(uid);
     try {
       const savedCats = localStorage.getItem(getUserKey(STORAGE_KEYS.CATEGORIES, uid));
       const savedAccs = localStorage.getItem(getUserKey(STORAGE_KEYS.ACCOUNTS, uid));
@@ -255,137 +266,86 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const savedNotifs = localStorage.getItem(getUserKey(STORAGE_KEYS.NOTIFICATIONS, uid));
 
       setCategories(savedCats ? JSON.parse(savedCats) : INITIAL_CATEGORIES);
-      setAccounts(savedAccs ? JSON.parse(savedAccs) : demo ? INITIAL_ACCOUNTS : EMPTY_ACCOUNTS);
-      setTransactions(savedTxs ? JSON.parse(savedTxs) : demo ? INITIAL_TRANSACTIONS : []);
-      setBudgets(savedBudgets ? JSON.parse(savedBudgets) : demo ? INITIAL_BUDGETS : []);
-      setRecurring(savedRec ? JSON.parse(savedRec) : demo ? INITIAL_RECURRING : []);
-      setNotifications(savedNotifs ? JSON.parse(savedNotifs) : demo ? INITIAL_NOTIFICATIONS : []);
+      setAccounts(savedAccs ? JSON.parse(savedAccs) : EMPTY_ACCOUNTS);
+      setTransactions(savedTxs ? JSON.parse(savedTxs) : []);
+      setBudgets(savedBudgets ? JSON.parse(savedBudgets) : []);
+      setRecurring(savedRec ? JSON.parse(savedRec) : []);
+      setNotifications(savedNotifs ? JSON.parse(savedNotifs) : []);
     } catch {
       setCategories(INITIAL_CATEGORIES);
-      setAccounts(demo ? INITIAL_ACCOUNTS : EMPTY_ACCOUNTS);
-      setTransactions(demo ? INITIAL_TRANSACTIONS : []);
-      setBudgets(demo ? INITIAL_BUDGETS : []);
-      setRecurring(demo ? INITIAL_RECURRING : []);
-      setNotifications(demo ? INITIAL_NOTIFICATIONS : []);
+      setAccounts(EMPTY_ACCOUNTS);
+      setTransactions([]);
+      setBudgets([]);
+      setRecurring([]);
+      setNotifications([]);
     }
   };
 
   const login = (
-    identifierInput: string,
-    password?: string,
-    autoCreate = false,
-    bypassPassword = false
+    emailInput: string,
+    password?: string
   ): LoginResult => {
-    const trimmed = identifierInput.trim();
+    const trimmed = emailInput.trim().toLowerCase();
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
-    const cleanedPhone = trimmed.replace(/[\s.-]/g, '').replace(/^\+84/, '0');
-    const phoneRegex = /^0\d{8,10}$/;
 
-    const isGmail = gmailRegex.test(trimmed.toLowerCase());
-    const isPhone = phoneRegex.test(cleanedPhone);
-
-    if (!isGmail && !isPhone) {
+    if (!trimmed || !gmailRegex.test(trimmed)) {
       return {
         success: false,
         error: 'invalid_input',
-        message: 'Vui lòng nhập số điện thoại hoặc Gmail hợp lệ!',
+        message: 'Vui lòng nhập tài khoản Gmail hợp lệ (có đuôi @gmail.com)!',
       };
     }
 
-    const found = savedUsers.find((u) => {
-      if (isGmail && u.email) {
-        return u.email.toLowerCase() === trimmed.toLowerCase();
-      }
-      if (isPhone) {
-        const uPhone = (u.phone || '').replace(/[\s.-]/g, '').replace(/^\+84/, '0');
-        return uPhone === cleanedPhone || u.email === cleanedPhone;
-      }
-      return false;
-    });
+    const found = savedUsers.find(
+      (u) => u.email && u.email.toLowerCase() === trimmed
+    );
 
-    if (found) {
-      // Password verification: If bypassPassword is true (e.g. 1-click Google SSO), skip password check
-      if (!bypassPassword) {
-        const enteredPassword = (password || '').trim();
-        const expectedPassword = (found.password || '123456').trim();
-        const isMatch =
-          enteredPassword === expectedPassword ||
-          (isDemoUser(found.id) &&
-            (enteredPassword === '123456' || enteredPassword === 'password123'));
-
-        if (!isMatch) {
-          return {
-            success: false,
-            error: 'wrong_password',
-            message: 'Sai mật khẩu! Vui lòng kiểm tra lại mật khẩu của bạn.',
-          };
-        }
-      }
-
-      const verifiedUser = {
-        ...found,
-        emailVerified: true,
-        phone: isPhone ? cleanedPhone : found.phone,
-      };
-      setCurrentUser(verifiedUser);
-      setSavedUsers((prev) => prev.map((u) => (u.id === found.id ? verifiedUser : u)));
-      loadUserData(verifiedUser);
-      try {
-        confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
-      } catch {
-        // ignore
-      }
-      return { success: true };
-    } else if (autoCreate) {
-      // Dynamic login by Gmail or Phone Number -> New User starts with clean 0 data
-      const newUser: UserProfile = {
-        id: `user-${Date.now()}`,
-        name: isGmail ? trimmed.split('@')[0] : `Người dùng ${cleanedPhone.slice(-4)}`,
-        email: isGmail ? trimmed.toLowerCase() : `${cleanedPhone}@phone.vn`,
-        phone: isPhone ? cleanedPhone : undefined,
-        password: password?.trim() || '123456',
-        emailVerified: true,
-        gender: 'female',
-        bgTheme: 'sky-pink',
-        avatarColor: '#38bdf8',
-        joinedDate: new Date().toISOString().slice(0, 10),
-      };
-      setSavedUsers((prev) => [...prev, newUser]);
-      setCurrentUser(newUser);
-      initializeFreshUserData(newUser.id, newUser.name);
-      try {
-        confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
-      } catch {
-        // ignore
-      }
-      return { success: true };
-    } else {
+    if (!found) {
       return {
         success: false,
         error: 'not_found',
-        message: 'Tài khoản chưa được đăng ký trong hệ thống!',
+        message: `Tài khoản Gmail ${trimmed} chưa được đăng ký trong hệ thống. Vui lòng chuyển sang tab Đăng ký để tạo tài khoản mới!`,
       };
     }
-  };
 
-  const loginAsDemoUser = (user: UserProfile) => {
-    setCurrentUser(user);
-    loadUserData(user);
+    const enteredPassword = (password || '').trim();
+    if (!enteredPassword) {
+      return {
+        success: false,
+        error: 'empty_password',
+        message: 'Vui lòng nhập mật khẩu của bạn!',
+      };
+    }
+
+    const expectedPassword = (found.password || '123456').trim();
+    if (enteredPassword !== expectedPassword) {
+      return {
+        success: false,
+        error: 'wrong_password',
+        message: 'Sai mật khẩu! Vui lòng kiểm tra lại mật khẩu hoặc chọn "Quên mật khẩu?"',
+      };
+    }
+
+    const verifiedUser = {
+      ...found,
+      emailVerified: true,
+    };
+    setCurrentUser(verifiedUser);
+    setSavedUsers((prev) => prev.map((u) => (u.id === found.id ? verifiedUser : u)));
+    loadUserData(verifiedUser);
     try {
       confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
     } catch {
       // ignore
     }
+    return { success: true };
   };
 
   const register = (data: Omit<UserProfile, 'id' | 'joinedDate'>, password?: string) => {
-    const cleanedPhone = data.phone
-      ? data.phone.trim().replace(/[\s.-]/g, '').replace(/^\+84/, '0')
-      : undefined;
+    const emailTrimmed = (data.email || '').trim().toLowerCase();
     const newUser: UserProfile = {
       ...data,
-      email: (data.email || (cleanedPhone ? `${cleanedPhone}@phone.vn` : '')).trim().toLowerCase(),
-      phone: cleanedPhone,
+      email: emailTrimmed,
       password: password?.trim() || '123456',
       emailVerified: true,
       id: `user-${Date.now()}`,
@@ -403,6 +363,42 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // ignore
     }
     return true;
+  };
+
+  const resetPassword = (
+    emailIdentifier: string,
+    newPassword: string
+  ): { success: boolean; message: string; user?: UserProfile } => {
+    const trimmed = emailIdentifier.trim().toLowerCase();
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!trimmed || !gmailRegex.test(trimmed)) {
+      return { success: false, message: 'Vui lòng nhập địa chỉ Gmail hợp lệ (có đuôi @gmail.com)!' };
+    }
+    if (newPassword.trim().length < 4) {
+      return { success: false, message: 'Mật khẩu mới phải có ít nhất 4 ký tự!' };
+    }
+
+    const targetUser = savedUsers.find(
+      (u) => u.email && u.email.toLowerCase() === trimmed
+    );
+
+    if (!targetUser) {
+      return {
+        success: false,
+        message: `Không tìm thấy tài khoản với Gmail "${trimmed}". Vui lòng kiểm tra lại!`,
+      };
+    }
+
+    const updated: UserProfile = { ...targetUser, password: newPassword.trim() };
+    setSavedUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    if (currentUser?.id === updated.id) {
+      setCurrentUser(updated);
+    }
+    return {
+      success: true,
+      message: `Đặt lại mật khẩu thành công cho tài khoản "${targetUser.name}"! Bạn có thể dùng mật khẩu mới này để đăng nhập.`,
+      user: updated,
+    };
   };
 
   const logout = () => {
@@ -447,47 +443,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setCurrentUser(updatedUser);
     setSavedUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
     return { success: true, message: 'Đổi mật khẩu thành công!' };
-  };
-
-  const resetPassword = (
-    identifier: string,
-    newPassword: string
-  ): { success: boolean; message: string; user?: UserProfile } => {
-    const trimmed = identifier.trim();
-    if (!trimmed) {
-      return { success: false, message: 'Vui lòng nhập Số điện thoại hoặc Gmail!' };
-    }
-    if (newPassword.trim().length < 4) {
-      return { success: false, message: 'Mật khẩu mới phải có ít nhất 4 ký tự!' };
-    }
-
-    const cleanedPhone = trimmed.replace(/[\s.-]/g, '').replace(/^\+84/, '0');
-    const emailLower = trimmed.toLowerCase();
-
-    const targetUser = savedUsers.find((u) => {
-      const uPhone = u.phone ? u.phone.replace(/[\s.-]/g, '').replace(/^\+84/, '0') : '';
-      if (cleanedPhone && uPhone && uPhone === cleanedPhone) return true;
-      if (u.email && u.email.toLowerCase() === emailLower) return true;
-      return false;
-    });
-
-    if (!targetUser) {
-      return {
-        success: false,
-        message: `Không tìm thấy tài khoản với thông tin "${trimmed}". Vui lòng kiểm tra lại số điện thoại hoặc Gmail!`,
-      };
-    }
-
-    const updated: UserProfile = { ...targetUser, password: newPassword.trim() };
-    setSavedUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-    if (currentUser?.id === updated.id) {
-      setCurrentUser(updated);
-    }
-    return {
-      success: true,
-      message: `Đặt lại mật khẩu thành công cho tài khoản "${targetUser.name}"! Bạn có thể đăng nhập ngay.`,
-      user: updated,
-    };
   };
 
 
@@ -1018,7 +973,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         authModalMode,
         setAuthModalMode,
         login,
-        loginAsDemoUser,
         register,
         logout,
         updateUserProfile,

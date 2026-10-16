@@ -473,7 +473,7 @@ export const TopSlidebar: React.FC = () => {
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                              {currentUser.phone ? `SĐT: ${currentUser.phone}` : currentUser.email}
+                              {currentUser.email}
                             </p>
                             <p className="text-[10px] text-pink-600 font-medium truncate mt-0.5">
                               Giới tính:{' '}

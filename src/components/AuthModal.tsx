@@ -39,11 +39,9 @@ export const AuthModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     'login' | 'register' | 'profile' | 'forgot_password' | 'change_password'
   >('login');
-  const [authMethod, setAuthMethod] = useState<'phone' | 'gmail'>('phone');
 
-  // Login form state
+  // Login form state (chỉ bằng Gmail thật)
   const [loginGmail, setLoginGmail] = useState('');
-  const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -69,9 +67,7 @@ export const AuthModal: React.FC = () => {
   const [editPassword, setEditPassword] = useState('');
   const [showEditPassword, setShowEditPassword] = useState(false);
 
-  // Forgot password state
-  const [forgotMethod, setForgotMethod] = useState<'phone' | 'gmail'>('phone');
-  const [forgotPhone, setForgotPhone] = useState('');
+  // Forgot password state (qua Gmail đã đăng ký)
   const [forgotGmail, setForgotGmail] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
@@ -168,43 +164,11 @@ export const AuthModal: React.FC = () => {
     setForgotConfirmPassword('');
   };
 
-  // Direct login with password validation (sai mật khẩu sẽ báo lỗi và không đăng nhập được)
+  // Đăng nhập bằng Gmail và mật khẩu thật
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
-
-    if (!loginPassword.trim()) {
-      setErrorMessage('Vui lòng nhập mật khẩu để đăng nhập!');
-      return;
-    }
-
-    if (authMethod === 'phone') {
-      const cleaned = normalizePhone(loginPhone);
-      if (!cleaned) {
-        setErrorMessage('Vui lòng nhập số điện thoại để đăng nhập!');
-        return;
-      }
-      if (!phoneRegex.test(cleaned)) {
-        setErrorMessage('Vui lòng nhập số điện thoại hợp lệ (9 - 11 chữ số, bắt đầu bằng số 0)!');
-        return;
-      }
-
-      const res = login(cleaned, loginPassword, false);
-      if (res.success) {
-        setSuccessMessage('Đăng nhập thành công!');
-        setTimeout(() => {
-          handleClose();
-        }, 500);
-      } else if (res.error === 'wrong_password') {
-        setErrorMessage('Sai mật khẩu! Vui lòng kiểm tra lại mật khẩu hoặc chọn "Quên mật khẩu?"');
-      } else {
-        setErrorMessage(
-          `Số điện thoại ${cleaned} chưa được đăng ký trong hệ thống. Vui lòng chuyển sang tab Đăng ký để tạo tài khoản mới!`
-        );
-      }
-      return;
-    }
 
     const emailTrimmed = loginGmail.trim().toLowerCase();
     if (!emailTrimmed) {
@@ -217,7 +181,12 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    const res = login(emailTrimmed, loginPassword, false);
+    if (!loginPassword.trim()) {
+      setErrorMessage('Vui lòng nhập mật khẩu của bạn để đăng nhập!');
+      return;
+    }
+
+    const res = login(emailTrimmed, loginPassword);
     if (res.success) {
       setSuccessMessage('Đăng nhập thành công!');
       setTimeout(() => {
@@ -232,35 +201,7 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  // Quick Google Gmail Login button
-  const handleGoogleSignInClick = () => {
-    setErrorMessage('');
-    setSuccessMessage('');
-    setAuthMethod('gmail');
-
-    const targetEmail = (activeTab === 'register' ? regGmail : loginGmail).trim().toLowerCase();
-
-    if (!targetEmail) {
-      setErrorMessage('Vui lòng nhập địa chỉ Gmail của bạn để đăng nhập!');
-      return;
-    }
-
-    if (!gmailRegex.test(targetEmail)) {
-      setErrorMessage('Chỉ chấp nhận tài khoản Gmail hợp lệ có đuôi @gmail.com!');
-      return;
-    }
-
-    // Direct login via Google SSO (bypassPassword: true)
-    const res = login(targetEmail, '', true, true);
-    if (res.success) {
-      setSuccessMessage(`Đăng nhập bằng Gmail (${targetEmail}) thành công!`);
-      setTimeout(() => {
-        handleClose();
-      }, 500);
-    }
-  };
-
-  // Direct register with password validation
+  // Đăng ký tài khoản mới bằng Gmail và mật khẩu
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
@@ -268,54 +209,6 @@ export const AuthModal: React.FC = () => {
 
     if (!regName.trim()) {
       setErrorMessage('Vui lòng nhập họ và tên của bạn!');
-      return;
-    }
-
-    if (!regPassword.trim()) {
-      setErrorMessage('Vui lòng tạo mật khẩu cho tài khoản mới!');
-      return;
-    }
-
-    if (regPassword.length < 4) {
-      setErrorMessage('Mật khẩu phải có ít nhất 4 ký tự!');
-      return;
-    }
-
-    if (authMethod === 'phone') {
-      const cleaned = normalizePhone(regPhone);
-      if (!cleaned) {
-        setErrorMessage('Vui lòng nhập số điện thoại đăng ký!');
-        return;
-      }
-      if (!phoneRegex.test(cleaned)) {
-        setErrorMessage('Vui lòng nhập số điện thoại hợp lệ (ví dụ: 0912345678)!');
-        return;
-      }
-      if (savedUsers.some((u) => normalizePhone(u.phone || '') === cleaned)) {
-        setErrorMessage('Số điện thoại này đã được đăng ký. Vui lòng chuyển sang tab Đăng nhập hoặc Quên mật khẩu!');
-        return;
-      }
-
-      const success = register(
-        {
-          name: regName.trim(),
-          phone: cleaned,
-          email: `${cleaned}@phone.vn`,
-          emailVerified: true,
-          gender: regGender,
-          bgTheme: regBgTheme,
-          avatarColor: regAvatarColor,
-          avatarUrl: regAvatarUrl,
-        },
-        regPassword
-      );
-
-      if (success) {
-        setSuccessMessage('Đăng ký tài khoản thành công! Bắt đầu quản lý chi tiêu.');
-        setTimeout(() => {
-          handleClose();
-        }, 600);
-      }
       return;
     }
 
@@ -335,11 +228,20 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
+    if (!regPassword.trim()) {
+      setErrorMessage('Vui lòng tạo mật khẩu cho tài khoản mới!');
+      return;
+    }
+
+    if (regPassword.length < 4) {
+      setErrorMessage('Mật khẩu phải có ít nhất 4 ký tự!');
+      return;
+    }
+
     const success = register(
       {
         name: regName.trim(),
         email: emailTrimmed,
-        phone: regPhone.trim() ? normalizePhone(regPhone) : undefined,
         emailVerified: true,
         gender: regGender,
         bgTheme: regBgTheme,
@@ -357,33 +259,21 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  // Handle Forgot Password
+  // Đặt lại mật khẩu qua Gmail đã đăng ký
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
-    const targetInput = (forgotMethod === 'phone' ? forgotPhone : forgotGmail).trim();
-    if (!targetInput) {
-      setErrorMessage(
-        forgotMethod === 'phone'
-          ? 'Vui lòng nhập số điện thoại tài khoản của bạn!'
-          : 'Vui lòng nhập địa chỉ Gmail tài khoản của bạn!'
-      );
+    const emailTrimmed = forgotGmail.trim().toLowerCase();
+    if (!emailTrimmed) {
+      setErrorMessage('Vui lòng nhập địa chỉ Gmail tài khoản của bạn!');
       return;
     }
 
-    if (forgotMethod === 'phone') {
-      const cleaned = normalizePhone(forgotPhone);
-      if (!phoneRegex.test(cleaned)) {
-        setErrorMessage('Số điện thoại không hợp lệ (9 - 11 chữ số, bắt đầu bằng 0)!');
-        return;
-      }
-    } else {
-      if (!gmailRegex.test(targetInput)) {
-        setErrorMessage('Địa chỉ Gmail không đúng định dạng (phải có đuôi @gmail.com)!');
-        return;
-      }
+    if (!gmailRegex.test(emailTrimmed)) {
+      setErrorMessage('Địa chỉ Gmail không đúng định dạng (phải có đuôi @gmail.com)!');
+      return;
     }
 
     if (!forgotNewPassword.trim()) {
@@ -401,17 +291,10 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    const res = resetPassword(targetInput, forgotNewPassword);
+    const res = resetPassword(emailTrimmed, forgotNewPassword);
     if (res.success) {
       setSuccessMessage(res.message);
-      // Pre-fill login credentials
-      if (forgotMethod === 'phone') {
-        setLoginPhone(normalizePhone(forgotPhone));
-        setAuthMethod('phone');
-      } else {
-        setLoginGmail(targetInput.toLowerCase());
-        setAuthMethod('gmail');
-      }
+      setLoginGmail(emailTrimmed);
       setLoginPassword(forgotNewPassword);
 
       setTimeout(() => {
@@ -505,17 +388,10 @@ export const AuthModal: React.FC = () => {
   };
 
   // Matched user for forgot password live preview
-  const cleanedForgotPhone = normalizePhone(forgotPhone);
   const emailLower = forgotGmail.trim().toLowerCase();
   const matchedForgotUser = savedUsers.find((u) => {
-    if (forgotMethod === 'phone') {
-      if (!cleanedForgotPhone || cleanedForgotPhone.length < 8) return false;
-      const uPhone = normalizePhone(u.phone || '');
-      return uPhone === cleanedForgotPhone;
-    } else {
-      if (!emailLower || !emailLower.includes('@gmail.com')) return false;
-      return u.email.toLowerCase() === emailLower;
-    }
+    if (!emailLower || !emailLower.includes('@gmail.com')) return false;
+    return u.email && u.email.toLowerCase() === emailLower;
   });
 
   const colorOptions = [
@@ -570,12 +446,12 @@ export const AuthModal: React.FC = () => {
               </h3>
               <p className="text-[11px] text-slate-400">
                 {activeTab === 'forgot_password'
-                  ? 'Đặt lại mật khẩu cho tài khoản Số điện thoại hoặc Gmail'
+                  ? 'Đặt lại mật khẩu cho tài khoản Gmail đã đăng ký'
                   : activeTab === 'change_password'
                   ? 'Cập nhật mật khẩu bảo mật mới cho tài khoản của bạn'
                   : activeTab === 'profile'
                   ? 'Quản lý thông tin và bảo mật tài khoản'
-                  : 'Hỗ trợ đăng nhập & đăng ký bằng Số điện thoại hoặc Gmail'}
+                  : 'Đăng nhập & quản lý chi tiêu bằng tài khoản Gmail'}
               </p>
             </div>
           </div>
@@ -590,7 +466,7 @@ export const AuthModal: React.FC = () => {
 
         {/* Tab switchers for Login / Register */}
         {!currentUser && (activeTab === 'login' || activeTab === 'register') && (
-          <div className="space-y-2.5 mb-4">
+          <div className="mb-4">
             <div className="flex items-center p-1 bg-sky-50/80 rounded-2xl border border-sky-100">
               <button
                 type="button"
@@ -625,42 +501,6 @@ export const AuthModal: React.FC = () => {
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 Đăng ký
-              </button>
-            </div>
-
-            {/* Method Toggle: Số điện thoại vs Gmail */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                id="btn-method-phone"
-                onClick={() => {
-                  setAuthMethod('phone');
-                  setErrorMessage('');
-                }}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
-                  authMethod === 'phone'
-                    ? 'bg-linear-to-r from-sky-100/90 to-pink-100/90 border-sky-300 text-slate-800 shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Phone className="w-3.5 h-3.5 text-sky-600" />
-                <span>Bằng Số điện thoại</span>
-              </button>
-              <button
-                type="button"
-                id="btn-method-gmail"
-                onClick={() => {
-                  setAuthMethod('gmail');
-                  setErrorMessage('');
-                }}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
-                  authMethod === 'gmail'
-                    ? 'bg-linear-to-r from-sky-100/90 to-pink-100/90 border-pink-300 text-slate-800 shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5 text-pink-500" />
-                <span>Bằng Gmail</span>
               </button>
             </div>
           </div>
@@ -719,48 +559,25 @@ export const AuthModal: React.FC = () => {
         {!currentUser && activeTab === 'login' && (
           <div className="space-y-4">
             <form onSubmit={handleLoginSubmit} className="space-y-3.5">
-              {authMethod === 'phone' ? (
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Số điện thoại <span className="text-pink-500">*</span>:
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Phone className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      required
-                      id="input-login-phone"
-                      placeholder="Ví dụ: 0912345678"
-                      value={loginPhone}
-                      onChange={(e) => setLoginPhone(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-sky-500 focus:bg-white transition"
-                    />
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Tài khoản Gmail <span className="text-pink-500">*</span>:
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="w-4 h-4" />
                   </div>
+                  <input
+                    type="email"
+                    required
+                    id="input-login-identifier"
+                    placeholder="tenban@gmail.com"
+                    value={loginGmail}
+                    onChange={(e) => setLoginGmail(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-sky-500 focus:bg-white transition"
+                  />
                 </div>
-              ) : (
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Tài khoản Gmail <span className="text-pink-500">*</span>:
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      id="input-login-identifier"
-                      placeholder="tenban@gmail.com"
-                      value={loginGmail}
-                      onChange={(e) => setLoginGmail(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-sky-500 focus:bg-white transition"
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -808,12 +625,8 @@ export const AuthModal: React.FC = () => {
                   onClick={() => {
                     setErrorMessage('');
                     setSuccessMessage('');
-                    if (authMethod === 'phone' && loginPhone) {
-                      setForgotPhone(loginPhone);
-                      setForgotMethod('phone');
-                    } else if (authMethod === 'gmail' && loginGmail) {
+                    if (loginGmail) {
                       setForgotGmail(loginGmail);
-                      setForgotMethod('gmail');
                     }
                     setActiveTab('forgot_password');
                   }}
@@ -823,47 +636,15 @@ export const AuthModal: React.FC = () => {
                 </button>
               </div>
 
-              <div className="pt-1 space-y-2.5">
+              <div className="pt-1">
                 <button
                   type="submit"
                   id="btn-submit-login"
                   className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-linear-to-r from-sky-500 to-pink-500 hover:from-sky-600 hover:to-pink-600 text-white transition shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>
-                    {authMethod === 'phone'
-                      ? 'Đăng nhập bằng Số điện thoại'
-                      : 'Đăng nhập bằng Gmail'}
-                  </span>
+                  <span>Đăng nhập</span>
                 </button>
-
-                {authMethod === 'gmail' && (
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignInClick}
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-white hover:bg-sky-50/70 text-slate-700 border border-sky-200 transition shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"
-                      />
-                    </svg>
-                    <span>Tiếp tục nhanh với Google</span>
-                  </button>
-                )}
               </div>
             </form>
           </div>
@@ -892,48 +673,25 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
-            {authMethod === 'phone' ? (
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Số điện thoại đăng ký <span className="text-pink-500">*</span>:
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    required
-                    id="input-reg-phone"
-                    placeholder="Ví dụ: 0912345678"
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition"
-                  />
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Địa chỉ Gmail đăng ký <span className="text-pink-500">*</span>:
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="w-4 h-4" />
                 </div>
+                <input
+                  type="email"
+                  required
+                  id="input-reg-gmail"
+                  placeholder="tenban@gmail.com"
+                  value={regGmail}
+                  onChange={(e) => setRegGmail(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition"
+                />
               </div>
-            ) : (
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Địa chỉ Gmail <span className="text-pink-500">*</span>:
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="email"
-                    required
-                    id="input-reg-gmail"
-                    placeholder="tenban@gmail.com"
-                    value={regGmail}
-                    onChange={(e) => setRegGmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition"
-                  />
-                </div>
-              </div>
-            )}
+            </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">
@@ -1065,88 +823,30 @@ export const AuthModal: React.FC = () => {
               <div>
                 <p className="font-semibold text-amber-950">Đặt lại mật khẩu</p>
                 <p className="text-[11px] text-amber-800/90 mt-0.5">
-                  Nhập Số điện thoại hoặc Gmail tài khoản đã đăng ký để thiết lập mật khẩu mới ngay lập tức.
+                  Nhập tài khoản Gmail đã đăng ký để thiết lập mật khẩu mới ngay lập tức.
                 </p>
               </div>
             </div>
 
-            {/* Method switch for forgot password */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setForgotMethod('phone');
-                  setErrorMessage('');
-                  setSuccessMessage('');
-                }}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
-                  forgotMethod === 'phone'
-                    ? 'bg-amber-100/80 border-amber-300 text-amber-900 shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Phone className="w-3.5 h-3.5 text-amber-600" />
-                <span>Bằng Số điện thoại</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setForgotMethod('gmail');
-                  setErrorMessage('');
-                  setSuccessMessage('');
-                }}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
-                  forgotMethod === 'gmail'
-                    ? 'bg-amber-100/80 border-amber-300 text-amber-900 shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5 text-amber-600" />
-                <span>Bằng Gmail</span>
-              </button>
-            </div>
-
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
-              {forgotMethod === 'phone' ? (
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Số điện thoại đã đăng ký <span className="text-pink-500">*</span>:
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Phone className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      required
-                      placeholder="Ví dụ: 0912345678"
-                      value={forgotPhone}
-                      onChange={(e) => setForgotPhone(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition"
-                    />
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Tài khoản Gmail đã đăng ký <span className="text-pink-500">*</span>:
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="w-4 h-4" />
                   </div>
+                  <input
+                    type="email"
+                    required
+                    placeholder="tenban@gmail.com"
+                    value={forgotGmail}
+                    onChange={(e) => setForgotGmail(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                  />
                 </div>
-              ) : (
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Tài khoản Gmail đã đăng ký <span className="text-pink-500">*</span>:
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      placeholder="tenban@gmail.com"
-                      value={forgotGmail}
-                      onChange={(e) => setForgotGmail(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition"
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
 
               {/* Live Preview of Matched Account */}
               {matchedForgotUser && (
@@ -1162,7 +862,7 @@ export const AuthModal: React.FC = () => {
                       ✓ Đã tìm thấy tài khoản: {matchedForgotUser.name}
                     </span>
                     <span className="text-[10px] text-emerald-700 block truncate">
-                      {matchedForgotUser.phone ? `SĐT: ${matchedForgotUser.phone}` : matchedForgotUser.email}
+                      {matchedForgotUser.email}
                     </span>
                   </div>
                 </div>

@@ -466,42 +466,5 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
   },
 ];
 
-export const DEFAULT_USERS: UserProfile[] = [
-  {
-    id: 'user-minhanh',
-    name: 'Nguyễn Minh Anh',
-    email: 'minhanh.nguyen@gmail.com',
-    phone: '0981122334',
-    password: '123456',
-    emailVerified: true,
-    gender: 'female',
-    bgTheme: 'sky-pink',
-    avatarColor: '#f472b6',
-    joinedDate: '2023-09-05',
-  },
-  {
-    id: 'user-quanghuy',
-    name: 'Trần Quang Huy',
-    email: 'quanghuy.tran@gmail.com',
-    phone: '0972233445',
-    password: '123456',
-    emailVerified: true,
-    gender: 'male',
-    bgTheme: 'blue-dream',
-    avatarColor: '#38bdf8',
-    joinedDate: '2022-10-12',
-  },
-  {
-    id: 'user-maiphuong',
-    name: 'Lê Mai Phương',
-    email: 'maiphuong.le@gmail.com',
-    phone: '0963344556',
-    password: '123456',
-    emailVerified: true,
-    gender: 'female',
-    bgTheme: 'pink-blossom',
-    avatarColor: '#ec4899',
-    joinedDate: '2024-01-15',
-  },
-];
+export const DEFAULT_USERS: UserProfile[] = [];
 
