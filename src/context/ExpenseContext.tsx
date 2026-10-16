@@ -26,6 +26,7 @@ import {
   exportTransactionsToCSV,
   exportTransactionsToExcel,
 } from '../utils/exportTransactions';
+import { clearAllCookies } from '../utils/authSession';
 
 interface ExpenseContextType {
   transactions: Transaction[];
@@ -405,7 +406,16 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const logout = () => {
+    console.log('[Auth] Đang thực hiện đăng xuất tài khoản...');
     setCurrentUser(null);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      sessionStorage.clear();
+      clearAllCookies();
+    } catch (err) {
+      console.error('[Auth] Lỗi khi dọn dẹp storage khi logout:', err);
+    }
+    console.info('[Auth] Đăng xuất hoàn tất. Đã dọn dẹp phiên và cookies.');
   };
 
   const updateUserProfile = (profile: Partial<UserProfile>) => {
